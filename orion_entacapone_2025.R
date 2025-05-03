@@ -440,18 +440,6 @@ lmtest::coeftest(model, vcov = vcovCL, cluster = ~anonyme_id)
 
 cochran_model <- DescTools::CochranArmitageTest(table(trend_data$act_datedeb, trend_data$Entacapone))
 
-# 	Cochran-Armitage test for trend
-# 
-# data:  table(trend_data$act_datedeb, trend_data$Entacapone)
-# Z = -5.2822, dim = 2271, p-value = 1.277e-07
-# alternative hypothesis: two.sided
-# 
-
-# 	Cochran-Armitage test for trend
-# 
-# data:  table(trend_data$act_datedeb, trend_data$Entacapone)
-# Z = -4.3836, dim = 2029, p-value = 1.167e-05
-# alternative hypothesis: two.sided
 
 
 model <- lme4::glmer(Entacapone ~ act_datedeb + (1 | anonyme_id), 
@@ -460,76 +448,6 @@ model <- lme4::glmer(Entacapone ~ act_datedeb + (1 | anonyme_id),
 
 summary(model)
 
-
-# Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
-#  Family: binomial  ( logit )
-# Formula: Entacapone ~ act_datedeb + (1 | anonyme_id)
-#    Data: trend_data
-# 
-#      AIC      BIC   logLik deviance df.resid 
-#  12400.8  12425.9  -6197.4  12394.8    32270 
-# 
-# Scaled residuals: 
-#     Min      1Q  Median      3Q     Max 
-# -7.8220 -0.0083 -0.0061 -0.0048  4.8226 
-# 
-# Random effects:
-#  Groups     Name        Variance Std.Dev.
-#  anonyme_id (Intercept) 161.3    12.7    
-# Number of obs: 32273, groups:  anonyme_id, 4427
-# 
-# Fixed effects:
-#               Estimate Std. Error z value Pr(>|z|)    
-# (Intercept) -2.436e+01  5.411e-01  -45.02   <2e-16 ***
-# act_datedeb  8.005e-04  2.803e-05   28.56   <2e-16 ***
-# ---
-# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# Correlation of Fixed Effects:
-#             (Intr)
-# act_datedeb -0.949
-# optimizer (Nelder_Mead) convergence code: 0 (OK)
-# Model failed to converge with max|grad| = 14.207 (tol = 0.002, component 1)
-# Model is nearly unidentifiable: very large eigenvalue
-#  - Rescale variables?
-# Model is nearly unidentifiable: large eigenvalue ratio
-#  - Rescale variables?
-
-
-
-# Generalized linear mixed model fit by maximum likelihood (Laplace Approximation) ['glmerMod']
-#  Family: binomial  ( logit )
-# Formula: Entacapone ~ act_datedeb + (1 | anonyme_id)
-#    Data: trend_data
-# 
-#      AIC      BIC   logLik deviance df.resid 
-#   4823.3   4845.3  -2408.7   4817.3    11025 
-# 
-# Scaled residuals: 
-#     Min      1Q  Median      3Q     Max 
-# -7.2298 -0.0114 -0.0081 -0.0059  4.6911 
-# 
-# Random effects:
-#  Groups     Name        Variance Std.Dev.
-#  anonyme_id (Intercept) 118.3    10.88   
-# Number of obs: 11028, groups:  anonyme_id, 906
-# 
-# Fixed effects:
-#               Estimate Std. Error z value Pr(>|z|)    
-# (Intercept) -2.247e+01  4.725e-01  -47.55   <2e-16 ***
-# act_datedeb  7.273e-04  2.402e-05   30.28   <2e-16 ***
-# ---
-# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-# 
-# Correlation of Fixed Effects:
-#             (Intr)
-# act_datedeb -0.711
-# optimizer (Nelder_Mead) convergence code: 0 (OK)
-# Model failed to converge with max|grad| = 1.51291 (tol = 0.002, component 1)
-# Model is nearly unidentifiable: very large eigenvalue
-#  - Rescale variables?
-# Model is nearly unidentifiable: large eigenvalue ratio
-#  - Rescale variables?
 
 library(prophet)
 
