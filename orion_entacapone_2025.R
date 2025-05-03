@@ -420,23 +420,6 @@ model <- glm(as.factor(Entacapone) ~ act_datedeb, family = binomial(), data = tr
 
 lmtest::coeftest(model, vcov = vcovCL, cluster = ~anonyme_id)
 
-# z test of coefficients:
-# 
-#                Estimate  Std. Error z value  Pr(>|z|)    
-# (Intercept) -3.0228e+00  5.3731e-01 -5.6259 1.845e-08 ***
-# act_datedeb  8.5855e-05  2.9535e-05  2.9069   0.00365 ** 
-# ---
-# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# z test of coefficients:
-# 
-#                Estimate  Std. Error z value Pr(>|z|)    
-# (Intercept) -3.1340e+00  8.9452e-01 -3.5036 0.000459 ***
-# act_datedeb  1.0536e-04  4.8675e-05  2.1646 0.030419 *  
-# ---
-# Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
 
 cochran_model <- DescTools::CochranArmitageTest(table(trend_data$act_datedeb, trend_data$Entacapone))
 
