@@ -409,9 +409,6 @@ ggsave("../out/smooth_fit_v2.svg", plot = plot, width = 8, height = 6, device = 
 
 
 
-
-
-
 trend_data  <- Consultation_subset %>% select(anonyme_id, act_datedeb, Entacapone) %>% drop_na()
 
 trend_data <- trend_data %>% filter(as.Date(act_datedeb)>="2016-01-01")
