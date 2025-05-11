@@ -3008,25 +3008,20 @@ results %>%
 
 # Case-Crossover Design
 
-
 df <- Consultation_20250106 %>% select(anonyme_id, act_datedeb, Entacapone) %>%
   arrange(anonyme_id, act_datedeb, Entacapone) %>%
   inner_join(Consultation_20250106 %>% filter(Entacapone==1) %>% select(anonyme_id) %>% distinct())
 
 length(unique(df$anonyme_id)) # 3565
 
-
 df <- df %>% arrange(anonyme_id, act_datedeb, Entacapone) %>%
   group_by(anonyme_id, act_datedeb) %>% summarise(Entacapone=max(Entacapone)) %>% ungroup()
 
-
 pats_stopped <- df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>% select(anonyme_id) %>% distinct()
-
 
 df <- df %>% left_join(pats_stopped %>% mutate(group="stopped")) %>% mutate(group=ifelse(is.na(group),"cont", group ))
 
 df <- df %>% inner_join(pats_stopped)
-
 
 df <- df %>% left_join(
   df %>% group_by(anonyme_id) %>% 
@@ -3037,8 +3032,6 @@ df <- df %>% left_join(
   ) %>%
   mutate(elapsed=as.numeric(act_datedeb-first_stop)) %>%
   filter(abs(elapsed)<=5000)
-
-
 
 
 df_casecross <- df %>%
@@ -3055,8 +3048,6 @@ df_casecross <- df %>%
 
 df_wide <- df_casecross %>%
   pivot_wider(names_from = window, values_from = c(fluct_motrice:tr_cognitif), names_sep = "_")
-
-
 
 
 results <- purrr::map_dfr(names(df_wide)[grepl("_baseline$", names(df_wide))], function(baseline_col) {
@@ -3076,6 +3067,5 @@ results <- purrr::map_dfr(names(df_wide)[grepl("_baseline$", names(df_wide))], f
     tibble(symptom = symptom, n = nrow(data), p_value = NA, median_diff = NA)
   }
 })
-
 
 # ------------
