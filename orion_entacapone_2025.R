@@ -1051,6 +1051,418 @@ for (center in centers) {
 # ----------------------
 
 
+# Check Drug Penetrance Over Time - Other Antiparkinsonian Classes -------------
+# Packages
+
+libraries <- c("data.table", "tidyverse", "readxl", "showtext", "sandwich", "lmtest")
+
+lapply(libraries, 
+       function(libraries) {
+         if (!require(libraries, character.only=TRUE)) {
+           install.packages(libraries); require(libraries)
+           }}
+       )
+
+(.packages())
+
+# Inclusion/Demographics data
+
+Inclusion_20250106 <- read_excel(path = "../data/Inclusion_20250106.xlsx")
+
+Inclusion_20250106 <- Inclusion_20250106[Inclusion_20250106$diag=="MP",]
+
+length(unique(Inclusion_20250106$anonyme_id)) # 30331
+
+# Consultation/Visit data
+
+Consultation_20250106 <- read_excel(path = "../data/Consultation_20250106.xlsx")
+
+Consultation_20250106 <- merge(
+  Consultation_20250106,
+  unique(Inclusion_20250106["anonyme_id"]),
+  by = "anonyme_id"
+)
+
+length(unique(Consultation_20250106$anonyme_id)) # 25603
+
+names(Consultation_20250106)
+
+
+
+
+
+# si le patient a pris le traitement A
+IMAOB <- c("ttt_azil_rasag1_yn___yes","ttt_safinamide_50_yn___yes","ttt_safinamide_100_yn___yes"  ,"ttt_selegiline_yn___yes")
+Consultation_20250106$A <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% IMAOB], na.rm = TRUE)
+Consultation_20250106$A <- ifelse(Consultation_20250106$A != 0, 1, 0)
+
+
+# si le patient a pris le traitement B
+Levodopa <- c("ttt_modopar_125_cpr_yn___yes","ttt_modopar_62_5_gel_yn___yes", "ttt_modopar_125_gel_yn___yes" , "ttt_modopar_250_gel_yn___yes","ttt_modopar_lp125_gel_yn___yes","ttt_sinemet_100_cpr_yn___yes" ,"ttt_sinemet_250_cpr_yn___yes" ,"ttt_sinemet_lp100_cpr_yn___yes" ,"ttt_sinemet_lp200_cpr_yn___yes" ,"ttt_stalevo_50_cpr_yn___yes" , "ttt_stalevo_75_cpr_yn___yes" , "ttt_stalevo_100_cpr_yn___yes" ,"ttt_stalevo_125_cpr_yn___yes"  ,"ttt_stalevo_150_cpr_yn___yes" , "ttt_stalevo_175_cpr_yn___yes" ,"ttt_stalevo_200_cpr_yn___yes")
+Consultation_20250106$B <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Levodopa], na.rm = TRUE)
+Consultation_20250106$B <- ifelse(Consultation_20250106$B != 0, 1, 0)
+
+# si le patient a pris le traitement C
+Agonistes <- c( "ttt_neu_rot2_yn___yes","ttt_neu_rot4_yn___yes"       ,"ttt_neu_rot6_yn___yes","ttt_neu_rot8_yn___yes","ttt_ral_brom5_yn___yes"        ,"ttt_ral_brom10_yn___yes"    ,"ttt_ral_brom2_5m_yn___yes","req_rop2_yn___yes","ttt_req_rop4_yn___yes"         ,"ttt_req_rop8_yn___yes" ,"ttt_req_rop025_yn___yes","ttt_req_rop050_yn___yes","ttt_req_rop1_yn___yes","ttt_req_rop2_yn___yes","ttt_req_rop5_yn___yes", "ttt_sif_pram026_yn___yes", "ttt_sif_pram052_yn___yes"     ,"ttt_sif_pram105_yn___yes","ttt_sif_pram210_yn___yes","ttt_sif_pram018_yn___yes", "ttt_sif_pram070_yn___yes","ttt_triv_prim20_yn___yes"     ,"ttt_triv_per_lp50_yn___yes","ttt_apo_stylo_yn___yes")
+Consultation_20250106$C <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Agonistes], na.rm = TRUE)
+Consultation_20250106$C <- ifelse(Consultation_20250106$C != 0, 1, 0)
+
+# si le patient a pris le traitement D
+Consultation_20250106$D <- Consultation_20250106$ttt_amantadine_yn___yes
+
+# si le patient a pris le traitement E
+ICOMB <- c("ttt_comptan_entac_yn___yes","ttt_tasm_talc100_yn___yes","ttt_stalevo_50_cpr_yn___yes" , "ttt_stalevo_75_cpr_yn___yes" , "ttt_stalevo_100_cpr_yn___yes" ,"ttt_stalevo_125_cpr_yn___yes"  ,"ttt_stalevo_150_cpr_yn___yes" , "ttt_stalevo_175_cpr_yn___yes" ,"ttt_stalevo_200_cpr_yn___yes")
+Consultation_20250106$E <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% ICOMB], na.rm = TRUE)
+Consultation_20250106$E <- ifelse(Consultation_20250106$E != 0, 1, 0)
+
+# si le patient a pris le traitement Traitements Oraux
+Consultation_20250106$pompe <- ifelse(is.na(Consultation_20250106$pompe_dose), 0,  ifelse((Consultation_20250106$pompe_dose == "DM" & is.na(Consultation_20250106$pompe_date)), 0,ifelse(!is.na(Consultation_20250106$pompe_dose) & Consultation_20250106$pompe_dose != 0, 1, 0)))
+
+Consultation_20250106$pompe_2 <- ifelse(is.na(Consultation_20250106$pompe_dose_2), 0,  ifelse((Consultation_20250106$pompe_dose_2 == "DM" & is.na(Consultation_20250106$pompe_date_2)), 0,ifelse(!is.na(Consultation_20250106$pompe_dose_2) & Consultation_20250106$pompe_dose_2 != 0, 1, 0)))
+
+Consultation_20250106$TO <- ifelse(Consultation_20250106$A == 1 | Consultation_20250106$B == 1 | Consultation_20250106$C == 1 | 
+                              Consultation_20250106$D == 1 | Consultation_20250106$E == 1,1,0)
+
+# si le patient a pris le traitement Stimulation Cérébrale Profonde
+SCP <- c("cible___2","cible___1", "cible___3")
+Consultation_20250106$SCP <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% SCP], na.rm = TRUE)
+Consultation_20250106$SCP <- ifelse(Consultation_20250106$SCP != 0, 1, 0)
+
+# si le patient a pris le traitement Lévodopa Gel Intestinal
+LGI <- c("pompe_2")
+Consultation_20250106$LGI <- Consultation_20250106$pompe_2
+
+# si le patient a pris le traitement Apomorphine Sous Cutanée
+ASC <- c("pompe")
+Consultation_20250106$ASC <- Consultation_20250106$pompe
+
+# si le patient a pris le traitement psychotique
+Antipsychotique <- c("ttt_leponex_100_yn___yes","ttt_quetiapine_50_yn___yes","ttt_quetiapine_300_yn___yes","ttt_quetiapine_400_yn___yes")
+Anticholinestherasique <- c("ttt_ache_yn___yes","ttt_exelon_yn___yes")
+Consultation_20250106$Antipsychotique <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Antipsychotique], na.rm = TRUE)
+Consultation_20250106$Antipsychotique <- ifelse(Consultation_20250106$Antipsychotique != 0, 1, 0)
+Consultation_20250106$Anticholinestherasique <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Anticholinestherasique], na.rm = TRUE)
+Consultation_20250106$Anticholinestherasique <- ifelse(Consultation_20250106$Anticholinestherasique != 0, 1, 0)
+
+
+
+
+
+
+drug_cols <- c(
+  "ttt_comptan_entac_yn___yes",
+  "ttt_tasm_talc100_yn___yes",
+  "ttt_stalevo_50_cpr_yn___yes",
+  "ttt_stalevo_75_cpr_yn___yes",
+  "ttt_stalevo_100_cpr_yn___yes",
+  "ttt_stalevo_125_cpr_yn___yes",
+  "ttt_stalevo_150_cpr_yn___yes",
+  "ttt_stalevo_175_cpr_yn___yes",
+  "ttt_stalevo_200_cpr_yn___yes"
+)
+
+Consultation_20250106$Entacapone <- as.numeric(
+  rowSums(Consultation_20250106[, drug_cols] == 1, 
+  na.rm = TRUE) > 0)
+
+
+
+Consultation_20250106 <- Consultation_20250106 %>% 
+  select(anonyme_id, act_datedeb,
+         fluct_motrice:hoehn_yahr_off,ttt_ledd_totale,
+         Anticholinestherasique, Antipsychotique, ASC, LGI, SCP, TO, A, B, C, D ,
+         Entacapone)
+
+
+
+names(Consultation_20250106)
+
+Consultation_20250106$act_datedeb <- as.Date(Consultation_20250106$act_datedeb)
+
+
+Consultation_20250106 <- Consultation_20250106[
+  format(Consultation_20250106$act_datedeb, "%Y") >= "2012" &
+  format(Consultation_20250106$act_datedeb, "%Y") <= "2025",
+]
+
+
+# MAOB Inhibitor
+
+monthly_summary <- Consultation_20250106 %>%
+  mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(month) %>%
+  summarise(pct_A = mean(A == 1, na.rm = TRUE), count=n())
+
+yearly_summary <- Consultation_20250106 %>%
+  mutate(year = as.Date(format(act_datedeb, "%Y-01-01"))) %>%
+  group_by(year) %>%
+  summarise(pct_A = mean(A == 1, na.rm = TRUE), count=n()) %>%
+  mutate(level = "Yearly")
+
+daily_pct <- Consultation_20250106 %>%
+  group_by(act_datedeb) %>%
+  summarise(pct_A = mean(A, na.rm = TRUE), count=n()) %>%
+  ungroup()
+
+
+
+
+
+sysfonts::font_add(family = "bahnschrift", regular = "bahnschrift.ttf")  # Adjust path if needed
+
+# Monthly
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = pct_A)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "% Monthly Patient-visits ON MAOB Inhib",
+       x = "\n Exact Date",
+       y = "% Patient-visits on MAOB Inhib \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+plot
+
+ggsave("../out/monthly_v1_MAOB.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = count)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+  labs(title = "Number of Patient-visits",
+       x = "\n Exact Date",
+       y = "Number of Patient-visits \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+ggsave("../out/monthlycounts__v1_MAOB.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+
+
+
+
+
+# Levodopa 
+
+monthly_summary <- Consultation_20250106 %>%
+  mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(month) %>%
+  summarise(pct_B = mean(B == 1, na.rm = TRUE), count=n())
+
+yearly_summary <- Consultation_20250106 %>%
+  mutate(year = as.Date(format(act_datedeb, "%Y-01-01"))) %>%
+  group_by(year) %>%
+  summarise(pct_B = mean(B == 1, na.rm = TRUE), count=n()) %>%
+  mutate(level = "Yearly")
+
+daily_pct <- Consultation_20250106 %>%
+  group_by(act_datedeb) %>%
+  summarise(pct_B = mean(B, na.rm = TRUE), count=n()) %>%
+  ungroup()
+
+
+
+
+
+sysfonts::font_add(family = "bahnschrift", regular = "bahnschrift.ttf")  # Adjust path if needed
+
+# Monthly
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = pct_B)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "% Monthly Patient-visits ON Levodopa",
+       x = "\n Exact Date",
+       y = "% Patient-visits on Levodopa \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+plot
+
+ggsave("../out/monthly_v1_Levodopa.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = count)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+  labs(title = "Number of Patient-visits",
+       x = "\n Exact Date",
+       y = "Number of Patient-visits \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+plot
+
+ggsave("../out/monthlycounts__v1_Levodopa.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+
+
+
+
+
+# Levodopa 
+
+monthly_summary <- Consultation_20250106 %>%
+  mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(month) %>%
+  summarise(pct_C = mean(C == 1, na.rm = TRUE), count=n())
+
+yearly_summary <- Consultation_20250106 %>%
+  mutate(year = as.Date(format(act_datedeb, "%Y-01-01"))) %>%
+  group_by(year) %>%
+  summarise(pct_C = mean(C == 1, na.rm = TRUE), count=n()) %>%
+  mutate(level = "Yearly")
+
+daily_pct <- Consultation_20250106 %>%
+  group_by(act_datedeb) %>%
+  summarise(pct_C = mean(C, na.rm = TRUE), count=n()) %>%
+  ungroup()
+
+
+
+
+
+sysfonts::font_add(family = "bahnschrift", regular = "bahnschrift.ttf")  # Adjust path if needed
+
+# Monthly
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = pct_C)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(title = "% Monthly Patient-visits ON Dopa Agonists",
+       x = "\n Exact Date",
+       y = "% Patient-visits on Dopa Agonists \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+plot
+
+ggsave("../out/monthly_v1_Agonists.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+
+plot <- ggplot(monthly_summary, aes(x = month, y = count)) +
+  geom_col(fill = "#234b6a") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "3 months") +
+  labs(title = "Number of Patient-visits",
+       x = "\n Exact Date",
+       y = "Number of Patient-visits \n") +
+  theme_minimal(base_family = "bahnschrift") +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
+  ) +
+    theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 90, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt")) 
+
+plot
+
+ggsave("../out/monthlycounts__v1_Agonists.svg", plot = plot, width = 8, height = 6, device = "svg")
+
+# ------
+
 # Which factors drive Entacapone usage? --------------------------------
 
 # Packages
@@ -3008,20 +3420,25 @@ results %>%
 
 # Case-Crossover Design
 
+
 df <- Consultation_20250106 %>% select(anonyme_id, act_datedeb, Entacapone) %>%
   arrange(anonyme_id, act_datedeb, Entacapone) %>%
   inner_join(Consultation_20250106 %>% filter(Entacapone==1) %>% select(anonyme_id) %>% distinct())
 
 length(unique(df$anonyme_id)) # 3565
 
+
 df <- df %>% arrange(anonyme_id, act_datedeb, Entacapone) %>%
   group_by(anonyme_id, act_datedeb) %>% summarise(Entacapone=max(Entacapone)) %>% ungroup()
 
+
 pats_stopped <- df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>% select(anonyme_id) %>% distinct()
+
 
 df <- df %>% left_join(pats_stopped %>% mutate(group="stopped")) %>% mutate(group=ifelse(is.na(group),"cont", group ))
 
 df <- df %>% inner_join(pats_stopped)
+
 
 df <- df %>% left_join(
   df %>% group_by(anonyme_id) %>% 
@@ -3032,6 +3449,8 @@ df <- df %>% left_join(
   ) %>%
   mutate(elapsed=as.numeric(act_datedeb-first_stop)) %>%
   filter(abs(elapsed)<=5000)
+
+
 
 
 df_casecross <- df %>%
@@ -3048,6 +3467,8 @@ df_casecross <- df %>%
 
 df_wide <- df_casecross %>%
   pivot_wider(names_from = window, values_from = c(fluct_motrice:tr_cognitif), names_sep = "_")
+
+
 
 
 results <- purrr::map_dfr(names(df_wide)[grepl("_baseline$", names(df_wide))], function(baseline_col) {
@@ -3068,4 +3489,863 @@ results <- purrr::map_dfr(names(df_wide)[grepl("_baseline$", names(df_wide))], f
   }
 })
 
+
+
+
+
+
+
+
+
+
+
+
+# MAX PEAK SYMPTOM SEVERITY
+
+symptoms <- c("fluct_motrice", "dyskinesie", "douleur", "nociceptive", "neuropathique", 
+              "dysarthrie", "freezing", "chute_instab", "deform_post", "tr_degl", "chute", 
+              "somnolence", "insomnie", "fatigue", "rbd", "sas", "sjsr", "hypotension", 
+              "digestif", "urine", "poids", "apathie", "depression", "anxiete", 
+              "halluc_psy", "tci", "add_ldopa", "punding", "tr_cognitif")
+
+
+Consultation_20250106
+
+
+
+symptoms_extended <- c("fluct_motrice", "dyskinesie", "douleur", "nociceptive", "neuropathique", 
+              "dysarthrie", "freezing", "chute_instab", "deform_post", "tr_degl", "chute", 
+              "somnolence", "insomnie", "fatigue", "rbd", "sas", "sjsr", "hypotension", 
+              "digestif", "urine", "poids", "apathie", "depression", "anxiete", 
+              "halluc_psy", "tci", "add_ldopa", "punding", "tr_cognitif", 
+              "Entacapone", "age", "disease_dur", "hoehn_yahr_on", "hoehn_yahr_off", "ttt_ledd_totale")
+
+names(Consultation_20250106)
+
+dt <- as.data.table(Consultation_20250106)
+
+
+result <- dt[, lapply(.SD, function(x) max(x, na.rm = TRUE)), 
+             by = anonyme_id, .SDcols = symptoms_extended]
+
+
+result <- result %>%
+  mutate(across(all_of(symptoms_extended), ~ ifelse(is.infinite(.x), NA_real_, .x)))
+
+
+model_results <- map_dfr(symptoms, function(symptom) {
+  formula <- as.formula(paste(symptom, "~ Entacapone + fluct_motrice"))
+  fit <- lm(formula, data = result)
+  broom::tidy(fit) %>% 
+    filter(term == "Entacapone") %>%   # focus on Entacapone effect
+    mutate(symptom = symptom)
+})
+
+
+data.frame(model_results)
+
+
+result %>%
+  select(fluct_motrice, Entacapone, tci) %>%
+  filter(!is.infinite(tci)&!is.infinite(fluct_motrice)&!is.infinite(Entacapone)) %>%
+  group_by(fluct_motrice, Entacapone) %>% summarise(tci=mean(tci, na.rm=T))
+
+
+
+model_results <- map_dfr(symptoms, function(symptom) {
+  formula <- as.formula(paste(symptom, "~ Entacapone + fluct_motrice + hoehn_yahr_on + age + disease_dur + hoehn_yahr_off"))
+  fit <- lm(formula, data = result)
+  broom::tidy(fit) %>% 
+    filter(term == "Entacapone") %>%   # focus on Entacapone effect
+    mutate(symptom = symptom)
+})
+
+data.frame(model_results)
+
+
+
+
+
+
+# Time-varying cox regression 
+
+
+symptoms_extended <- c("fluct_motrice", "dyskinesie", "douleur", "nociceptive", "neuropathique", 
+              "dysarthrie", "freezing", "chute_instab", "deform_post", "tr_degl", "chute", 
+              "somnolence", "insomnie", "fatigue", "rbd", "sas", "sjsr", "hypotension", 
+              "digestif", "urine", "poids", "apathie", "depression", "anxiete", 
+              "halluc_psy", "tci", "add_ldopa", "punding", "tr_cognitif", 
+              "Entacapone", "age", "disease_dur", "hoehn_yahr_on", "hoehn_yahr_off", "ttt_ledd_totale")
+
+names(Consultation_20250106)
+
+
+# Step 1: Keep patients who ever had Entacapone ON
+on_patients <- Consultation_20250106 %>%
+  group_by(anonyme_id) %>%
+  filter(Entacapone == 1) %>% select(anonyme_id, act_datedeb) %>%
+  ungroup() %>% distinct()
+
+entacapone_start <- on_patients %>%
+  group_by(anonyme_id) %>%
+  summarise(start_date = min(act_datedeb)) %>% distinct()
+
+episodes <- Consultation_20250106 %>%
+  inner_join(entacapone_start, by = "anonyme_id") %>%
+  filter(act_datedeb >= start_date) %>%
+  arrange(anonyme_id, act_datedeb) %>%
+  group_by(anonyme_id) %>%
+  mutate(
+    time = as.numeric(act_datedeb - start_date),
+    status = ifelse(Entacapone == 0 & lag(Entacapone == 1, default = 0), 1, 0),  # flag discontinuation
+    stop_event = cumsum(status),  
+  ) %>%
+  ungroup()
+
+
+max(episodes$stop_event)
+
+episodes <- episodes %>% group_by(anonyme_id) %>% filter(stop_event==0 | stop_event==1)
+
+episodes <- episodes %>% mutate(stop_event = cumsum(stop_event)) %>% group_by(anonyme_id) %>% filter(stop_event==0 | stop_event==1)
+
+episodes <- episodes %>% group_by(anonyme_id) %>% count() %>% filter(n>1) %>% select(anonyme_id) %>% distinct() %>%
+  left_join(episodes) %>% ungroup()
+
+
+cox_model <- survival::coxph(survival::Surv(time, event) ~ halluc_psy , data = cox_data)
+
+summary(cox_model)
+
+cox_data <- cox_data %>%
+  group_by(anonyme_id) %>%
+  arrange(anonyme_id, time) %>%
+  # Fill missing symptom values down then up
+  tidyr::fill(all_of(symptoms), .direction = "downup")
+
+cox_data_filled_lagged <- cox_data %>%
+  group_by(anonyme_id) %>%
+  arrange(anonyme_id, time) %>%
+  # Fill missing symptom values down then up
+  tidyr::fill(all_of(symptoms), .direction = "downup") %>%
+  # Replace symptoms with their lagged values (lag by 1 visit)
+  mutate(across(all_of(symptoms), ~ lag(.))) %>%
+  ungroup()
+
+
+run_symptom_cox <- function(symptom) {
+  formula <- as.formula(paste0("survival::Surv(time, event) ~ ", symptom,
+                               " + hoehn_yahr_on + hoehn_yahr_off + age + disease_dur"))
+  model <- survival::coxph(formula, data = cox_data)
+  broom::tidy(model, exponentiate = TRUE, conf.int = TRUE) %>%
+    filter(term == symptom) %>%
+    mutate(symptom = symptom) %>%
+    select(symptom, estimate, conf.low, conf.high, statistic, p.value) 
+}
+
+
+cox_results <- symptoms %>%  map_dfr(run_symptom_cox)
+
+
+
+
+symptom_labels <- c(
+  "fluct_motrice"   = "Motor fluctuations",
+  "dyskinesie"      = "Dyskinesia",
+  "douleur"         = "Pain (unspecified)",
+  "nociceptive"     = "Nociceptive pain",
+  "neuropathique"   = "Neuropathic pain",
+  "dysarthrie"      = "Dysarthria",
+  "freezing"        = "Freezing of gait",
+  "chute_instab"    = "Falls/instability",
+  "deform_post"     = "Postural deformities",
+  "tr_degl"         = "Swallowing difficulties",
+  "chute"           = "Falls",
+  "somnolence"      = "Somnolence",
+  "insomnie"        = "Insomnia",
+  "fatigue"         = "Fatigue",
+  "rbd"             = "REM sleep behavior disorder",
+  "sas"             = "Sleep apnea (SAS)",
+  "sjsr"            = "Restless legs syndrome",
+  "hypotension"     = "Orthostatic hypotension",
+  "digestif"        = "Digestive issues",
+  "urine"           = "Urinary symptoms",
+  "poids"           = "Weight change",
+  "apathie"         = "Apathy",
+  "depression"      = "Depression",
+  "anxiete"         = "Anxiety",
+  "halluc_psy"      = "Psychotic symptoms",
+  "tci"             = "Impulse control disorders",
+  "add_ldopa"       = "Levodopa addiction",
+  "punding"         = "Punding",
+  "tr_cognitif"     = "Cognitive impairment"
+)
+
+
+
+
+plot <- data.frame(cox_results) %>% 
+  arrange(estimate) %>%  # Arrange by HR
+    mutate(symptom = symptom_labels[symptom]) %>%  # Map to English labels
+  mutate(symptom = factor(symptom, levels = symptom)) %>%  # Reorder factor levels
+  ggplot(aes(x = symptom, y = estimate, ymin = conf.low, ymax = conf.high)) +
+  geom_pointrange(color = "#212f3d", size = 0.9) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray50") +
+  coord_flip() +
+  labs(
+    title = "Hazar Ratio for Entacapone Discontinuation \n ",
+    x = "",
+    y = "\n Hazard Ratio (95% C.I.)"
+  ) +
+   theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position = "right") +
+  theme(panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.line = element_blank(),
+        axis.text.x = element_text( angle = 0, vjust = 0.5, hjust = 1),
+        axis.text.y = element_text(),
+        axis.title.x = element_text(size = 10, vjust = -0.5),
+        axis.title.y = element_text(size = 10, vjust = -0.5),
+        plot.margin = margin(5, 5, 5, 5, "pt"))
+
+ggsave(
+    filename = paste0("../out/time_var_cox_plot.svg"),
+    plot = plot,
+    width = 8, height = 6, device = "svg"
+  )
+
+
 # ------------
+# Heatmaps individual symptoms over time--------------
+
+# Packages
+
+libraries <- c("data.table", "tidyverse", "readxl", "showtext", "sandwich", "lmtest")
+
+lapply(libraries, 
+       function(libraries) {
+         if (!require(libraries, character.only=TRUE)) {
+           install.packages(libraries); require(libraries)
+           }}
+       )
+
+(.packages())
+
+# Inclusion/Demographics data
+
+Inclusion_20250106 <- read_excel(path = "../data/Inclusion_20250106.xlsx")
+
+Inclusion_20250106 <- Inclusion_20250106[Inclusion_20250106$diag=="MP",]
+
+length(unique(Inclusion_20250106$anonyme_id)) # 30331
+
+# Consultation/Visit data
+
+Consultation_20250106 <- read_excel(path = "../data/Consultation_20250106.xlsx")
+
+Consultation_20250106 <- merge(
+  Consultation_20250106,
+  unique(Inclusion_20250106["anonyme_id"]),
+  by = "anonyme_id"
+)
+
+length(unique(Consultation_20250106$anonyme_id)) # 25603
+
+names(Consultation_20250106)
+
+
+
+
+
+# si le patient a pris le traitement A
+IMAOB <- c("ttt_azil_rasag1_yn___yes","ttt_safinamide_50_yn___yes","ttt_safinamide_100_yn___yes"  ,"ttt_selegiline_yn___yes")
+Consultation_20250106$A <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% IMAOB], na.rm = TRUE)
+Consultation_20250106$A <- ifelse(Consultation_20250106$A != 0, 1, 0)
+
+
+# si le patient a pris le traitement B
+Levodopa <- c("ttt_modopar_125_cpr_yn___yes","ttt_modopar_62_5_gel_yn___yes", "ttt_modopar_125_gel_yn___yes" , "ttt_modopar_250_gel_yn___yes","ttt_modopar_lp125_gel_yn___yes","ttt_sinemet_100_cpr_yn___yes" ,"ttt_sinemet_250_cpr_yn___yes" ,"ttt_sinemet_lp100_cpr_yn___yes" ,"ttt_sinemet_lp200_cpr_yn___yes" ,"ttt_stalevo_50_cpr_yn___yes" , "ttt_stalevo_75_cpr_yn___yes" , "ttt_stalevo_100_cpr_yn___yes" ,"ttt_stalevo_125_cpr_yn___yes"  ,"ttt_stalevo_150_cpr_yn___yes" , "ttt_stalevo_175_cpr_yn___yes" ,"ttt_stalevo_200_cpr_yn___yes")
+Consultation_20250106$B <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Levodopa], na.rm = TRUE)
+Consultation_20250106$B <- ifelse(Consultation_20250106$B != 0, 1, 0)
+
+# si le patient a pris le traitement C
+Agonistes <- c( "ttt_neu_rot2_yn___yes","ttt_neu_rot4_yn___yes"       ,"ttt_neu_rot6_yn___yes","ttt_neu_rot8_yn___yes","ttt_ral_brom5_yn___yes"        ,"ttt_ral_brom10_yn___yes"    ,"ttt_ral_brom2_5m_yn___yes","req_rop2_yn___yes","ttt_req_rop4_yn___yes"         ,"ttt_req_rop8_yn___yes" ,"ttt_req_rop025_yn___yes","ttt_req_rop050_yn___yes","ttt_req_rop1_yn___yes","ttt_req_rop2_yn___yes","ttt_req_rop5_yn___yes", "ttt_sif_pram026_yn___yes", "ttt_sif_pram052_yn___yes"     ,"ttt_sif_pram105_yn___yes","ttt_sif_pram210_yn___yes","ttt_sif_pram018_yn___yes", "ttt_sif_pram070_yn___yes","ttt_triv_prim20_yn___yes"     ,"ttt_triv_per_lp50_yn___yes","ttt_apo_stylo_yn___yes")
+Consultation_20250106$C <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Agonistes], na.rm = TRUE)
+Consultation_20250106$C <- ifelse(Consultation_20250106$C != 0, 1, 0)
+
+# si le patient a pris le traitement D
+Consultation_20250106$D <- Consultation_20250106$ttt_amantadine_yn___yes
+
+# si le patient a pris le traitement E
+ICOMB <- c("ttt_comptan_entac_yn___yes","ttt_tasm_talc100_yn___yes","ttt_stalevo_50_cpr_yn___yes" , "ttt_stalevo_75_cpr_yn___yes" , "ttt_stalevo_100_cpr_yn___yes" ,"ttt_stalevo_125_cpr_yn___yes"  ,"ttt_stalevo_150_cpr_yn___yes" , "ttt_stalevo_175_cpr_yn___yes" ,"ttt_stalevo_200_cpr_yn___yes")
+Consultation_20250106$E <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% ICOMB], na.rm = TRUE)
+Consultation_20250106$E <- ifelse(Consultation_20250106$E != 0, 1, 0)
+
+# si le patient a pris le traitement Traitements Oraux
+Consultation_20250106$pompe <- ifelse(is.na(Consultation_20250106$pompe_dose), 0,  ifelse((Consultation_20250106$pompe_dose == "DM" & is.na(Consultation_20250106$pompe_date)), 0,ifelse(!is.na(Consultation_20250106$pompe_dose) & Consultation_20250106$pompe_dose != 0, 1, 0)))
+
+Consultation_20250106$pompe_2 <- ifelse(is.na(Consultation_20250106$pompe_dose_2), 0,  ifelse((Consultation_20250106$pompe_dose_2 == "DM" & is.na(Consultation_20250106$pompe_date_2)), 0,ifelse(!is.na(Consultation_20250106$pompe_dose_2) & Consultation_20250106$pompe_dose_2 != 0, 1, 0)))
+
+Consultation_20250106$TO <- ifelse(Consultation_20250106$A == 1 | Consultation_20250106$B == 1 | Consultation_20250106$C == 1 | 
+                              Consultation_20250106$D == 1 | Consultation_20250106$E == 1,1,0)
+
+# si le patient a pris le traitement Stimulation Cérébrale Profonde
+SCP <- c("cible___2","cible___1", "cible___3")
+Consultation_20250106$SCP <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% SCP], na.rm = TRUE)
+Consultation_20250106$SCP <- ifelse(Consultation_20250106$SCP != 0, 1, 0)
+
+# si le patient a pris le traitement Lévodopa Gel Intestinal
+LGI <- c("pompe_2")
+Consultation_20250106$LGI <- Consultation_20250106$pompe_2
+
+# si le patient a pris le traitement Apomorphine Sous Cutanée
+ASC <- c("pompe")
+Consultation_20250106$ASC <- Consultation_20250106$pompe
+
+# si le patient a pris le traitement psychotique
+Antipsychotique <- c("ttt_leponex_100_yn___yes","ttt_quetiapine_50_yn___yes","ttt_quetiapine_300_yn___yes","ttt_quetiapine_400_yn___yes")
+Anticholinestherasique <- c("ttt_ache_yn___yes","ttt_exelon_yn___yes")
+Consultation_20250106$Antipsychotique <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Antipsychotique], na.rm = TRUE)
+Consultation_20250106$Antipsychotique <- ifelse(Consultation_20250106$Antipsychotique != 0, 1, 0)
+Consultation_20250106$Anticholinestherasique <- rowSums(Consultation_20250106[, names(Consultation_20250106) %in% Anticholinestherasique], na.rm = TRUE)
+Consultation_20250106$Anticholinestherasique <- ifelse(Consultation_20250106$Anticholinestherasique != 0, 1, 0)
+
+
+
+drug_cols <- c(
+  "ttt_comptan_entac_yn___yes",
+  "ttt_tasm_talc100_yn___yes",
+  "ttt_stalevo_50_cpr_yn___yes",
+  "ttt_stalevo_75_cpr_yn___yes",
+  "ttt_stalevo_100_cpr_yn___yes",
+  "ttt_stalevo_125_cpr_yn___yes",
+  "ttt_stalevo_150_cpr_yn___yes",
+  "ttt_stalevo_175_cpr_yn___yes",
+  "ttt_stalevo_200_cpr_yn___yes"
+)
+
+Consultation_20250106$Entacapone <- as.numeric(
+  rowSums(Consultation_20250106[, drug_cols] == 1, 
+  na.rm = TRUE) > 0)
+
+
+
+Consultation_20250106 <- Consultation_20250106 %>% 
+  select(anonyme_id, act_datedeb,
+         fluct_motrice:hoehn_yahr_off,ttt_ledd_totale,
+         Anticholinestherasique, Antipsychotique, ASC, LGI, SCP, TO, A, B, C, D ,
+         Entacapone)
+
+
+Consultation_20250106$fluct_motrice <- as.numeric(Consultation_20250106$fluct_motrice)
+Consultation_20250106$dyskinesie <- as.numeric(Consultation_20250106$dyskinesie)
+Consultation_20250106$douleur  <- as.numeric(Consultation_20250106$douleur )
+Consultation_20250106$dysarthrie  <- as.numeric(Consultation_20250106$dysarthrie )
+Consultation_20250106$freezing  <- as.numeric(Consultation_20250106$freezing )
+Consultation_20250106$chute_instab  <- as.numeric(Consultation_20250106$chute_instab )
+Consultation_20250106$deform_post   <- as.numeric(Consultation_20250106$deform_post  )
+Consultation_20250106$tr_degl   <- as.numeric(Consultation_20250106$tr_degl  )
+Consultation_20250106$somnolence    <- as.numeric(Consultation_20250106$somnolence   )
+Consultation_20250106$insomnie    <- as.numeric(Consultation_20250106$insomnie   )
+Consultation_20250106$fatigue     <- as.numeric(Consultation_20250106$fatigue    )
+Consultation_20250106$hypotension    <- as.numeric(Consultation_20250106$hypotension   )
+Consultation_20250106$digestif    <- as.numeric(Consultation_20250106$digestif   )
+Consultation_20250106$urine    <- as.numeric(Consultation_20250106$urine   )
+Consultation_20250106$poids     <- as.numeric(Consultation_20250106$poids    )
+Consultation_20250106$apathie    <- as.numeric(Consultation_20250106$apathie   )
+Consultation_20250106$depression     <- as.numeric(Consultation_20250106$depression    )
+Consultation_20250106$anxiete     <- as.numeric(Consultation_20250106$anxiete    )
+Consultation_20250106$halluc_psy       <- as.numeric(Consultation_20250106$halluc_psy      )
+Consultation_20250106$tci      <- as.numeric(Consultation_20250106$tci     )
+Consultation_20250106$add_ldopa      <- as.numeric(Consultation_20250106$add_ldopa     )
+Consultation_20250106$punding      <- as.numeric(Consultation_20250106$punding     )
+Consultation_20250106$tr_cognitif       <- as.numeric(Consultation_20250106$tr_cognitif      )
+Consultation_20250106$hoehn_yahr_on       <- as.numeric(Consultation_20250106$hoehn_yahr_on      )
+Consultation_20250106$hoehn_yahr_off       <- as.numeric(Consultation_20250106$hoehn_yahr_off      )
+Consultation_20250106$ttt_ledd_totale      <- as.numeric(Consultation_20250106$ttt_ledd_totale     )
+
+Consultation_20250106 <- Consultation_20250106 %>% 
+  mutate(sjsr=ifelse(sjsr=="Non",0,1)) %>%
+  mutate(sas=ifelse(sas=="Non",0,1)) %>%
+  mutate(rbd=ifelse(rbd=="Non",0,1)) %>%
+  mutate(chute=ifelse(chute=="Non",0,1)) %>%
+  mutate(neuropathique=ifelse(neuropathique!="OUI",0,1)) %>%
+  mutate(nociceptive=ifelse(nociceptive!="OUI",0,1)) 
+
+
+Consultation_20250106 <- Inclusion_20250106 %>% select(anonyme_id, diag_date_a, pat_ddn_a) %>% drop_na() %>%
+  mutate(diag_date_a=as.numeric(diag_date_a), pat_ddn_a=as.numeric(pat_ddn_a)) %>%
+  inner_join(Consultation_20250106) %>% 
+  mutate(act_datedeb=as.Date(act_datedeb)) %>%
+  mutate(year=str_sub(as.character(act_datedeb), 1L, 4L)) %>%
+  mutate(year=as.numeric(year)) %>%
+  mutate(age=year-pat_ddn_a) %>% 
+  mutate(disease_dur=year-diag_date_a) %>% select(-year, -diag_date_a, -pat_ddn_a)
+
+
+Entac_pats <- Consultation_20250106 %>% filter(Entacapone==1) %>% select(anonyme_id) %>% distinct()
+
+
+# Hallucinations
+
+halluc_psy_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, halluc_psy) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(halluc_psy, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, halluc_psy) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(halluc_psy, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+halluc_psy_df <- halluc_psy_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(halluc_psy_df)
+  
+halluc_psy_df <- halluc_psy_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), halluc_psy=max(halluc_psy))
+
+length(unique(halluc_psy_df$anonyme_id))
+
+
+halluc_psy_df <- halluc_psy_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(halluc_psy_df)
+
+halluc_psy_df <- halluc_psy_df %>% mutate(month=month-first) %>% select(-first)
+
+halluc_psy_plot_df <- halluc_psy_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+halluc_psy_plot_df <- halluc_psy_plot_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(halluc_psy = sum(halluc_psy), .groups = "drop")
+
+
+plot <- halluc_psy_plot_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(halluc_psy) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Hallucinations score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Hallucinations Score",
+    title = "Hallucinations before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/hallucinations.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+
+
+
+
+# Motor FLuctuations
+
+fluct_motrice_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, fluct_motrice) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(fluct_motrice, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, fluct_motrice) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(fluct_motrice, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+fluct_motrice_df <- fluct_motrice_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(fluct_motrice_df)
+  
+fluct_motrice_df <- fluct_motrice_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), fluct_motrice=max(fluct_motrice))
+
+length(unique(fluct_motrice_df$anonyme_id))
+
+
+fluct_motrice_df <- fluct_motrice_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(fluct_motrice_df)
+
+fluct_motrice_df <- fluct_motrice_df %>% mutate(month=month-first) %>% select(-first)
+
+fluct_motrice_df <- fluct_motrice_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+fluct_motrice_df <- fluct_motrice_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(fluct_motrice = sum(fluct_motrice), .groups = "drop")
+
+
+plot <- fluct_motrice_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(fluct_motrice) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Motor Fluctuations score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Motor Fluctuations Score",
+    title = "Motor Fluctuations before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/fluct_motrice.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+
+
+
+
+
+
+
+
+
+
+
+# Digestive
+
+digestif_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, digestif) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(digestif, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, digestif) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(digestif, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+digestif_df <- digestif_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(digestif_df)
+  
+digestif_df <- digestif_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), digestif=max(digestif))
+
+length(unique(digestif_df$anonyme_id))
+
+
+digestif_df <- digestif_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(digestif_df)
+
+digestif_df <- digestif_df %>% mutate(month=month-first) %>% select(-first)
+
+digestif_df <- digestif_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+digestif_df <- digestif_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(digestif = sum(digestif), .groups = "drop")
+
+
+plot <- digestif_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(digestif) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Digestive Problems score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Digestive Problems Score",
+    title = "Digestive Problems before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/digestif.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+
+
+
+
+
+
+# dyskinesie
+
+dyskinesie_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, dyskinesie) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(dyskinesie, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, dyskinesie) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(dyskinesie, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+dyskinesie_df <- dyskinesie_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(dyskinesie_df)
+  
+dyskinesie_df <- dyskinesie_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), dyskinesie=max(dyskinesie))
+
+length(unique(dyskinesie_df$anonyme_id))
+
+
+dyskinesie_df <- dyskinesie_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(dyskinesie_df)
+
+dyskinesie_df <- dyskinesie_df %>% mutate(month=month-first) %>% select(-first)
+
+dyskinesie_df <- dyskinesie_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+dyskinesie_df <- dyskinesie_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(dyskinesie = sum(dyskinesie), .groups = "drop")
+
+
+plot <- dyskinesie_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(dyskinesie) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Dyskinesias score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Dyskinesias Score",
+    title = "Dyskinesias before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/dyskinesie.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# tr_cognitif
+
+tr_cognitif_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, tr_cognitif) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(tr_cognitif, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, tr_cognitif) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(tr_cognitif, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+tr_cognitif_df <- tr_cognitif_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(tr_cognitif_df)
+  
+tr_cognitif_df <- tr_cognitif_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), tr_cognitif=max(tr_cognitif))
+
+length(unique(tr_cognitif_df$anonyme_id))
+
+
+tr_cognitif_df <- tr_cognitif_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(tr_cognitif_df)
+
+tr_cognitif_df <- tr_cognitif_df %>% mutate(month=month-first) %>% select(-first)
+
+tr_cognitif_df <- tr_cognitif_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+tr_cognitif_df <- tr_cognitif_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(tr_cognitif = sum(tr_cognitif), .groups = "drop")
+
+
+plot <- tr_cognitif_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(tr_cognitif) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Cognitive Impair score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Cognitive Impair Score",
+    title = "Cognitive Impair before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/tr_cognitif.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+
+
+
+
+
+
+
+
+
+
+
+# somnolence
+
+somnolence_df <- Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, somnolence) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(somnolence, .direction = c("downup")) %>%
+  drop_na() %>%
+  group_by(anonyme_id) %>% count() %>% filter(n>=10) %>% select(-n) %>%
+  left_join(
+    Consultation_20250106 %>% inner_join(Entac_pats) %>%
+  select(anonyme_id, act_datedeb, Entacapone, somnolence) %>%
+  arrange(anonyme_id, act_datedeb) %>% group_by(anonyme_id) %>%
+  fill(somnolence, .direction = c("downup")) %>%
+  drop_na()
+  )
+
+
+somnolence_df <- somnolence_df %>% group_by(anonyme_id) %>% filter(Entacapone==0&lag(Entacapone)==1) %>%
+  select(anonyme_id) %>% distinct() %>%
+  left_join(somnolence_df)
+  
+somnolence_df <- somnolence_df %>%   mutate(month = as.Date(format(act_datedeb, "%Y-%m-01"))) %>%
+  group_by(anonyme_id, month) %>% summarise(Entacapone=max(Entacapone), somnolence=max(somnolence))
+
+length(unique(somnolence_df$anonyme_id))
+
+
+somnolence_df <- somnolence_df %>% filter(Entacapone==1) %>% group_by(anonyme_id) %>% filter(month==min(month)) %>% 
+  rename("first"="month") %>% select(anonyme_id, first) %>%
+  left_join(somnolence_df)
+
+somnolence_df <- somnolence_df %>% mutate(month=month-first) %>% select(-first)
+
+somnolence_df <- somnolence_df %>%
+  mutate(month_offset = round(as.numeric(month, units = "days") / 30.44)) %>%  # Approximate month
+  filter(month_offset >= -24, month_offset <= 24)
+
+
+somnolence_df <- somnolence_df %>%
+  group_by(anonyme_id, month_offset, Entacapone ) %>%
+  summarise(somnolence = sum(somnolence), .groups = "drop")
+
+
+plot <- somnolence_df %>% 
+  ggplot(aes(x = month_offset, y = factor(anonyme_id), fill = factor(somnolence) )) +
+  geom_tile(color = "white") +
+ scale_fill_brewer(
+    palette = "Reds",
+    name = "Somnolence score",  # You can also call it “severity” etc.
+    direction = 1
+  ) +
+  labs(
+    x = "\n Months since Entacapone Initiation",
+    y = "Patient ID",
+    fill = "Somnolence Score",
+    title = "Somnolence before and after Entacapone iInitiation \n Patients >10 visits with available data "
+  ) +
+  theme_minimal(base_size = 10) +
+  theme(
+    axis.text.y = element_blank(),  # Hide y-axis labels for patients (too many)
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+plot
+
+ggsave("../out/Somnolence.svg", plot = plot, width = 6, height = 6, device = "svg")
+
+# --------
